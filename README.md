@@ -8,22 +8,56 @@
 ---
 
 ## 📋 Table of Contents
-1. [The Problem](#the-problem)
-2. [Meet Rajan — Our Persona](#meet-rajan--our-persona)
-3. [The Solution](#the-solution)
-4. [Core Features](#core-features)
-5. [Disruption Triggers](#disruption-triggers)
-6. [Weekly Premium Model](#weekly-premium-model)
-7. [AI/ML Architecture](#aiml-architecture)
-8. [Fraud Detection](#fraud-detection)
-9. [Tech Stack](#tech-stack)
-10. [System Architecture](#system-architecture)
-11. [Application Workflow](#application-workflow)
-12. [6-Week Development Plan](#6-week-development-plan)
-13. [Future Roadmap](#future-roadmap)
+1. [Events](#events)
+2. [The Problem](#the-problem)
+3. [Meet Rajan — Our Persona](#meet-rajan--our-persona)
+4. [The Solution](#the-solution)
+5. [Core Features](#core-features)
+6. [Disruption Triggers](#disruption-triggers)
+7. [Weekly Premium Model](#weekly-premium-model)
+8. [AI/ML Architecture](#aiml-architecture)
+9. [Fraud Detection](#fraud-detection)
+10. [Tech Stack](#tech-stack)
+11. [System Architecture](#system-architecture)
+12. [Application Workflow](#application-workflow)
+13. [6-Week Development Plan](#6-week-development-plan)
+14. [Future Roadmap](#future-roadmap)
 
 ---
 
+## Events
+
+### Phase 1 Market Crash — Adversarial Defense & Anti-Spoofing Strategy
+**Event Triggered: March 20, 2026** | **Status: LIVE** | **Deadline: March 20, 3:59 PM**
+
+**Nimbus Compliance Summary:**(Phase 2 implimentation)</br>
+Nimbus passes automated fraud validations through our production-ready **3-Layer Fraud Detection** + **named gig-economy fraud patterns**:
+
+| Validation Type | Nimbus Defense | Implementation |
+|----------------|---------------|----------------|
+| **GPS Spoofing** | Layer 1: Geospatial Validation | Flags impossible speeds (>100kmph), teleporting (>5km in <5min), GPS vs cell-tower mismatch |
+| **Rain-Chaser** | Named Pattern Detection | Max 1 payout per Event ID cluster across neighboring pincodes (4hr window) |
+| **Zone-Hopper** | Behavioral Anomaly | >2 pincode changes in 30 days → Trust Score -10 + manual review |
+| **Multi-Claim** | Event ID Uniques | 1 claim per worker per unique Disruption Event ID |
+| **False Trigger** | Layer 2: Cross-Signal | ≥2 independent APIs required (weather + AQI + platform drop) |
+
+**Key Code Locations:**
+```plaintext
+src/fraud/
+├── gps_validator.py              # Layer 1: speed/teleport detection
+├── event_id_generator.py         # Unique claims per disruption
+├── rain_chaser_detector.py       # Named pattern: zone hopping
+├── zone_hopper_monitor.py        # Pincode change frequency
+└── three_layer_orchestrator.py   # Parallel validation pipeline
+```
+
+**Demo Plan:** `demo/fraud_simulation.ipynb` — Spoofed GPS data pipeline catches all adversarial patterns (Phase 2 deliverable).
+
+**Trust Score Integration:** Low-score workers (<70) auto-routed to manual review even if technical validations pass.
+
+**Full details:** [Fraud Detection](#fraud-detection) | **Architecture Battle-Ready.**
+
+---
 ## The Problem
 
 India's 15+ million platform-based delivery partners (Zomato, Swiggy, Amazon, Flipkart, Zepto, Blinkit) are the backbone of the digital economy — yet they have **zero income protection** against uncontrollable external disruptions.
