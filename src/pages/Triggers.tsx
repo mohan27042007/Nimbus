@@ -2,28 +2,107 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, CloudRain, Thermometer, Droplets, Wind, AlertTriangle, Wifi, MapPin, AlertCircle } from "lucide-react";
+import {
+  Loader2,
+  CloudRain,
+  Thermometer,
+  Droplets,
+  Wind,
+  AlertTriangle,
+  Wifi,
+  MapPin,
+  AlertCircle,
+  RadioTower,
+} from "lucide-react";
 import { DisruptionEvent, DisruptionSeverity } from "@/types";
+import { fetchMLFraudScore } from "@/hooks/useMLApi";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const triggerTypes = [
-  { id: "rain", name: "Heavy Rain", icon: CloudRain, reading: "18mm/hr", threshold: "> 20mm/hr", source: "OpenWeatherMap" },
-  { id: "heat", name: "Extreme Heat", icon: Thermometer, reading: "38°C", threshold: "> 42°C", source: "OpenWeatherMap" },
-  { id: "flood", name: "Flood Alert", icon: Droplets, reading: "Normal", threshold: "Alert Level", source: "IMD API" },
-  { id: "aqi", name: "Severe AQI", icon: Wind, reading: "142", threshold: "> 300", source: "AQICN API" },
-  { id: "curfew", name: "Curfew / Strike", icon: AlertTriangle, reading: "None", threshold: "Active", source: "NewsAPI" },
-  { id: "platform", name: "Platform Order Drop", icon: Wifi, reading: "92%", threshold: "< 60%", source: "Mock API" },
-  { id: "gps", name: "GPS Dead Zone", icon: MapPin, reading: "Active", threshold: "No Signal", source: "GPS Layer" },
+  {
+    id: "rain",
+    name: "Heavy Rain",
+    icon: CloudRain,
+    reading: "18mm/hr",
+    threshold: "> 20mm/hr",
+    source: "OpenWeatherMap",
+  },
+  {
+    id: "heat",
+    name: "Extreme Heat",
+    icon: Thermometer,
+    reading: "38°C",
+    threshold: "> 42°C",
+    source: "OpenWeatherMap",
+  },
+  {
+    id: "flood",
+    name: "Flood Alert",
+    icon: Droplets,
+    reading: "Normal",
+    threshold: "Alert Level",
+    source: "IMD API",
+  },
+  {
+    id: "aqi",
+    name: "Severe AQI",
+    icon: Wind,
+    reading: "142",
+    threshold: "> 300",
+    source: "AQICN API",
+  },
+  {
+    id: "curfew",
+    name: "Curfew / Strike",
+    icon: AlertTriangle,
+    reading: "None",
+    threshold: "Active",
+    source: "NewsAPI",
+  },
+  {
+    id: "platform",
+    name: "Platform Order Drop",
+    icon: Wifi,
+    reading: "92%",
+    threshold: "< 60%",
+    source: "Mock API",
+  },
+  {
+    id: "gps",
+    name: "GPS Dead Zone",
+    icon: MapPin,
+    reading: "Active",
+    threshold: "No Signal",
+    source: "GPS Layer",
+  },
 ];
 
-/** DB + payout math (prompt). */
 const TYPE_DB: Record<string, { reading: string; threshold: string }> = {
   rain: { reading: "28mm/hr", threshold: ">20mm/hr" },
   heat: { reading: "43°C", threshold: ">42°C" },
@@ -48,6 +127,26 @@ function baseForType(t: string): number {
   return BASE_PAYOUT[t] ?? 200;
 }
 
+/** Severity badge ────────────────────────────────────────────── */
+function SeverityBadge({ severity }: { severity: string | null | undefined }) {
+  const s = (severity || "low").toLowerCase();
+  const map: Record<string, string> = {
+    low: "badge-low",
+    medium: "badge-medium",
+    high: "badge-high",
+    critical: "badge-critical",
+  };
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
+        map[s] ?? "badge-low"
+      }`}
+    >
+      {s}
+    </span>
+  );
+}
+
 const Triggers = () => {
   const [disruptions, setDisruptions] = useState<DisruptionEvent[]>([]);
   const [recentEvents, setRecentEvents] = useState<DisruptionEvent[]>([]);
@@ -61,7 +160,11 @@ const Triggers = () => {
   const load = useCallback(async () => {
     const [activeRes, allRes] = await Promise.all([
       supabase.from("disruptions").select("*").eq("status", "active"),
-      supabase.from("disruptions").select("*").order("triggered_at", { ascending: false }).limit(10),
+      supabase
+        .from("disruptions")
+        .select("*")
+        .order("triggered_at", { ascending: false })
+        .limit(10),
     ]);
     setDisruptions((activeRes.data as DisruptionEvent[]) || []);
     setRecentEvents((allRes.data as DisruptionEvent[]) || []);
@@ -78,16 +181,26 @@ const Triggers = () => {
     const eventId = `BLR-${Date.now().toString().slice(-6)}`;
 
     try {
+      // Only stack disruptions triggered in the last 2 hours — prevents
+      // old stale "active" events from accumulating and inflating payouts.
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
       const { data: existingRows } = await supabase
         .from("disruptions")
         .select("type")
         .eq("zone", simZone)
         .eq("pincode", simPincode)
-        .eq("status", "active");
+        .eq("status", "active")
+        .gte("triggered_at", twoHoursAgo);
 
       const existing = (existingRows || []) as { type: string }[];
-      const stackBonus = existing.reduce((sum, row) => sum + 0.7 * baseForType(row.type), 0);
+      // Cap stack bonus at 1× the primary base so a single co-event can add
+      // at most +70% — not an uncapped multiplier of N events.
+      const rawStack = existing.reduce(
+        (sum, row) => sum + 0.7 * baseForType(row.type),
+        0
+      );
       const primaryBase = baseForType(simType);
+      const stackBonus = Math.min(rawStack, primaryBase); // cap at 1× base
       const payoutAmount = Math.round(primaryBase + stackBonus);
 
       const { data: inserted, error: insErr } = await supabase
@@ -137,7 +250,9 @@ const Triggers = () => {
       }
 
       if (eligible.length === 0) {
-        toast.info("Disruption recorded. No workers with active policies matched this pincode.");
+        toast.info(
+          "Disruption recorded. No workers with active policies matched this pincode."
+        );
         setModalOpen(false);
         await load();
         return;
@@ -145,7 +260,9 @@ const Triggers = () => {
 
       const sampleCap = Math.min(payoutAmount, eligible[0]!.max_payout);
       toast.success(
-        `Disruption triggered in ${simZone}. Processing ₹${sampleCap} payout for ${eligible.length} worker${eligible.length === 1 ? "" : "s"}...`
+        `Disruption triggered in ${simZone}. Processing ₹${sampleCap} payout for ${eligible.length} worker${
+          eligible.length === 1 ? "" : "s"
+        }...`
       );
 
       for (const w of eligible) {
@@ -174,6 +291,44 @@ const Triggers = () => {
           continue;
         }
 
+        const fraudReq = {
+          trust_score: w.trust_score ?? 100,
+          gps_speed_kmph: 0,
+          gps_jump_km: 0,
+          gps_in_zone: 1,
+          api_confirmed: 1,
+          same_event_claims_count: 1,
+          pincode_changes_30days: 0,
+          weekly_claims: 1,
+          avg_weekly_claims: 0.5,
+          claim_spike_ratio: 1.0,
+          payout_amount: capped,
+          earnings_baseline: baseline,
+          payout_vs_baseline_ratio: capped / baseline,
+          hours_since_last_claim: 168,
+          zone_disruption_confirmed: 1,
+          neighbor_zone_payout: 0,
+        };
+
+        const fraudResult = await fetchMLFraudScore(fraudReq);
+        const shouldFlag = fraudResult ? fraudResult.fraud_score > 60 : false;
+
+        console.log(
+          "ML Fraud Score:",
+          fraudResult?.fraud_score,
+          "Flagged:",
+          shouldFlag,
+          "Flags:",
+          fraudResult?.flags
+        );
+
+        if (shouldFlag) {
+          await supabase
+            .from("claims")
+            .update({ fraud_flag: true })
+            .eq("id", claimRow.id);
+        }
+
         await sleep(2000);
         await supabase
           .from("claims")
@@ -188,7 +343,10 @@ const Triggers = () => {
           upi_id: w.upi_id || "",
           status: "completed",
         });
-        await supabase.from("claims").update({ status: "paid" }).eq("id", claimRow.id);
+        await supabase
+          .from("claims")
+          .update({ status: "paid" })
+          .eq("id", claimRow.id);
         await supabase
           .from("workers")
           .update({ trust_score: (w.trust_score ?? 0) + 1 })
@@ -217,50 +375,98 @@ const Triggers = () => {
   const activeIds = new Set(disruptions.map((d: DisruptionEvent) => d.type));
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">
+    <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">Disruption Trigger Monitor</h1>
-        <Button onClick={() => setModalOpen(true)} variant="destructive" className="gap-2">
-          <AlertCircle className="h-4 w-4" /> 🔴 Simulate Disruption
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight">
+            Disruption Monitor
+          </h1>
+          <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+            <RadioTower className="h-3.5 w-3.5" />
+            Monitoring 7 data sources every 15 minutes
+          </p>
+        </div>
+        <Button
+          onClick={() => setModalOpen(true)}
+          variant="destructive"
+          className="gap-2"
+        >
+          <AlertCircle className="h-4 w-4" />
+          Simulate Disruption
         </Button>
       </div>
 
+      {/* Sensor cards grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {triggerTypes.map((t) => {
           const isActive = activeIds.has(t.id);
-          const activeDisruption = disruptions.find((d: DisruptionEvent) => d.type === t.id);
-          const status = isActive ? "TRIGGERED" : "NORMAL";
-          const statusColor = isActive ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success";
+          const activeDisruption = disruptions.find(
+            (d: DisruptionEvent) => d.type === t.id
+          );
 
           return (
-            <div key={t.id} className="space-y-3 rounded-2xl border border-border bg-card p-5">
+            <div
+              key={t.id}
+              className={[
+                "glass-card rounded-2xl p-5 space-y-3 transition-all duration-300",
+                isActive
+                  ? "border-red-500/25 shadow-[0_0_20px_rgba(239,68,68,0.08)]"
+                  : "",
+              ].join(" ")}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <t.icon className="h-5 w-5 text-primary" />
+                  <t.icon
+                    className={`h-5 w-5 ${
+                      isActive ? "text-red-400" : "text-primary"
+                    }`}
+                  />
                   <span className="text-sm font-semibold">{t.name}</span>
                 </div>
-                <Badge className={statusColor}>{status}</Badge>
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide border ${
+                    isActive ? "badge-active" : "badge-normal"
+                  }`}
+                >
+                  {isActive ? "TRIGGERED" : "NORMAL"}
+                </span>
               </div>
               <div className="space-y-1 text-sm">
-                <p>
-                  Reading: <span className="font-medium">{activeDisruption?.reading || t.reading}</span>
-                </p>
-                <p>
-                  Threshold: <span className="text-muted-foreground">{t.threshold}</span>
-                </p>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Reading</span>
+                  <span
+                    className={`font-semibold ${
+                      isActive ? "text-red-400" : "text-foreground"
+                    }`}
+                  >
+                    {activeDisruption?.reading || t.reading}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Threshold</span>
+                  <span className="text-muted-foreground text-xs">
+                    {t.threshold}
+                  </span>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">Source: {t.source}</p>
+              <p className="text-[11px] text-muted-foreground">
+                Source: {t.source}
+              </p>
             </div>
           );
         })}
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="mb-4 font-semibold">Recent Trigger Events</h2>
+      {/* Recent events table */}
+      <div className="glass-card rounded-2xl p-6">
+        <h2 className="mb-4 font-semibold text-sm uppercase tracking-wider text-muted-foreground">
+          Recent Trigger Events
+        </h2>
         {recentEvents.length > 0 ? (
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="border-white/[0.06]">
                 <TableHead>Time</TableHead>
                 <TableHead>Event ID</TableHead>
                 <TableHead>Type</TableHead>
@@ -271,40 +477,50 @@ const Triggers = () => {
             </TableHeader>
             <TableBody>
               {recentEvents.map((e: DisruptionEvent) => (
-                <TableRow key={e.id}>
-                  <TableCell className="text-xs">{e.triggered_at ? new Date(e.triggered_at).toLocaleString() : "—"}</TableCell>
-                  <TableCell className="font-mono text-xs">{e.event_id}</TableCell>
-                  <TableCell className="capitalize">{e.type?.replace("_", " ")}</TableCell>
-                  <TableCell>{e.zone}</TableCell>
+                <TableRow key={e.id} className="border-white/[0.04]">
+                  <TableCell className="text-xs text-muted-foreground">
+                    {e.triggered_at
+                      ? new Date(e.triggered_at).toLocaleString()
+                      : "—"}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {e.event_id}
+                  </TableCell>
+                  <TableCell className="capitalize font-medium">
+                    {e.type?.replace("_", " ")}
+                  </TableCell>
+                  <TableCell className="text-sm">{e.zone}</TableCell>
                   <TableCell>
-                    <Badge
-                      className={
-                        e.severity === "high"
-                          ? "bg-destructive/10 text-destructive"
-                          : e.severity === "medium"
-                            ? "bg-warning/10 text-warning"
-                            : "bg-success/10 text-success"
-                      }
-                    >
-                      {e.severity?.toUpperCase()}
-                    </Badge>
+                    <SeverityBadge severity={e.severity} />
                   </TableCell>
                   <TableCell>
-                    <Badge variant={e.status === "active" ? "default" : "secondary"}>{e.status}</Badge>
+                    <Badge
+                      variant={
+                        e.status === "active" ? "default" : "secondary"
+                      }
+                    >
+                      {e.status}
+                    </Badge>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         ) : (
-          <p className="py-4 text-sm text-muted-foreground">All signals normal. Monitoring 7 data sources every 15 minutes.</p>
+          <p className="py-6 text-sm text-muted-foreground text-center">
+            All signals normal. No disruptions detected.
+          </p>
         )}
       </div>
 
+      {/* Simulate dialog */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent>
+        <DialogContent className="border border-white/10 bg-card dark:bg-[#0d1628] backdrop-blur-xl">
           <DialogHeader>
-            <DialogTitle>Simulate Disruption</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              Simulate Disruption
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -324,19 +540,42 @@ const Triggers = () => {
             </div>
             <div className="space-y-2">
               <Label>Zone</Label>
-              <Input value={simZone} onChange={(e) => setSimZone(e.target.value)} />
+              <Input
+                value={simZone}
+                onChange={(e) => setSimZone(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label>Pincode</Label>
-              <Input value={simPincode} onChange={(e) => setSimPincode(e.target.value)} />
+              <Input
+                value={simPincode}
+                onChange={(e) => setSimPincode(e.target.value)}
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setModalOpen(false)}
+              className="border-white/10 bg-white/5 hover:bg-white/10"
+            >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={simulate} disabled={simulating}>
-              {simulating ? "Triggering..." : "Trigger Disruption"}
+            <Button
+              variant="destructive"
+              onClick={simulate}
+              disabled={simulating}
+              className="gap-2"
+            >
+              {simulating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Triggering...
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-4 w-4" /> Trigger Disruption
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

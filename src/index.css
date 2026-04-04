@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;1,14..32,400&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -82,5 +82,103 @@
 
   body {
     @apply bg-background text-foreground font-sans;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
+
+/* ─── Ambient background blobs ─────────────────────────────── */
+@keyframes blob-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(40px, -30px) scale(1.05); }
+  66%       { transform: translate(-20px, 20px) scale(0.97); }
+}
+
+@keyframes blob-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40%       { transform: translate(-35px, 25px) scale(1.03); }
+  70%       { transform: translate(20px, -15px) scale(0.98); }
+}
+
+@keyframes blob-drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%       { transform: translate(25px, 30px) scale(1.04); }
+}
+
+.nimbus-blob-1 {
+  animation: blob-drift-1 22s ease-in-out infinite;
+}
+.nimbus-blob-2 {
+  animation: blob-drift-2 28s ease-in-out infinite;
+}
+.nimbus-blob-3 {
+  animation: blob-drift-3 18s ease-in-out infinite;
+}
+
+/* ─── AI status pulse dot ───────────────────────────────────── */
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.4); }
+  50%       { opacity: 0.85; transform: scale(1.15); box-shadow: 0 0 0 4px rgba(74, 222, 128, 0); }
+}
+
+.ai-pulse-dot {
+  animation: status-pulse 2s ease-in-out infinite;
+}
+
+/* ─── Radial trust ring reveal ──────────────────────────────── */
+@keyframes ring-reveal {
+  from { stroke-dashoffset: var(--ring-circumference); }
+  to   { stroke-dashoffset: var(--ring-offset); }
+}
+
+.trust-ring-arc {
+  animation: ring-reveal 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ─── Card entrance ─────────────────────────────────────────── */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.card-enter {
+  animation: card-in 0.4s ease-out both;
+}
+.card-enter-delay-1 { animation-delay: 0.08s; }
+.card-enter-delay-2 { animation-delay: 0.16s; }
+.card-enter-delay-3 { animation-delay: 0.24s; }
+
+/* ─── Glassmorphism card ────────────────────────────────────── */
+.glass-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* Dark mode override — actual glassmorphism effect */
+.dark .glass-card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  border-color: hsl(var(--primary) / 0.25);
+}
+
+.dark .glass-card:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  border-color: rgba(99, 179, 237, 0.18);
+}
+
+/* ─── severity badge utilities ──────────────────────────────── */
+.badge-low      { @apply bg-blue-500/10 text-blue-400 border border-blue-500/20; }
+.badge-medium   { @apply bg-amber-500/10 text-amber-400 border border-amber-500/20; }
+.badge-high     { @apply bg-red-500/10 text-red-400 border border-red-500/20; }
+.badge-critical { @apply bg-rose-600/15 text-rose-400 border border-rose-500/30; }
+.badge-normal   { @apply bg-emerald-500/10 text-emerald-400 border border-emerald-500/20; }
+.badge-active   { @apply bg-red-500/15 text-red-400 border border-red-500/25; }

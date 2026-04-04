@@ -1,0 +1,39 @@
+# Node
+node_modules
+npm-debug.log*
+
+# Build output
+dist
+build
+
+# Git
+.git
+.gitignore
+
+# Environment files
+.env.local
+.env.production
+.env.docker
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+.eggs
+pip-log.txt
+
+# ML training artifacts (not needed in container)
+backend/ml_service/*.csv
+backend/ml_service/*training*.py
+backend/ml_service/*generate*.py
+backend/ml_service/*.png
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log
+.vscode
+.idea

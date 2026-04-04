@@ -10,6 +10,16 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      '/api/premium': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/api/fraud': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      }
+    }
   },
   plugins: [react()],
   resolve: {
