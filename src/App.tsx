@@ -13,6 +13,7 @@ import Claims from "./pages/Claims";
 import Triggers from "./pages/Triggers";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import { SeedBootstrap } from "./components/SeedBootstrap";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <SeedBootstrap>
         <BrowserRouter>
           <Navbar />
           <Routes>
@@ -35,6 +37,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        </SeedBootstrap>
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>

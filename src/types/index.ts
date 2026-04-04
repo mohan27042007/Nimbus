@@ -88,24 +88,6 @@ export interface PremiumExplanationLine {
   displayValue: string;
 }
 
-export interface PremiumInputs {
-  tierId: string;
-  city: string;
-  zone: string;
-  pincode: string;
-  trustScore?: number;
-}
-
-export interface PremiumResult {
-  basePremium: number;
-  finalPremium: number;
-  riskLevel: "low" | "medium" | "high";
-  zoneAdjustment: number;
-  cityAdjustment: number;
-  trustDiscount: number;
-  explanation: PremiumExplanationLine[];
-}
-
 export interface PayoutExplanation {
   disruption_severity: DisruptionSeverity;
   baseline_earnings: number;

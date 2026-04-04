@@ -1,0 +1,11 @@
+# Exact pins from ML build document (install on Python 3.10 or 3.11 with pre-built wheels).
+# pandas 2.1.4 may require MSVC to build from source on some setups.
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+numpy==1.26.4
+pandas==2.1.4
+scikit-learn==1.4.0
+xgboost==2.0.3
+matplotlib==3.8.2
+shap==0.45.0

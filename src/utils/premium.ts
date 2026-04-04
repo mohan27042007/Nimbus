@@ -1,105 +1,53 @@
-import { PremiumInputs, PremiumResult, PremiumExplanationLine } from "../types";
+export type PremiumTier = "basic" | "standard" | "premium";
 
-const BASE_RATES: Record<string, number> = {
-  basic: 99,
-  standard: 179,
-  premium: 299,
+/**
+ * Deterministic premium (prompt spec). Same inputs → same output.
+ */
+export function calculatePremium(
+  zone_risk: number,
+  _earnings: number,
+  trust_score: number,
+  tier: PremiumTier,
+  forecast_rain: number,
+  forecast_aqi: number,
+  month: number
+): { premium: number; explainer: string } {
+  const base = { basic: 99, standard: 149, premium: 249 }[tier];
+
+  const risk_adj = Math.round((zone_risk / 100) * 30);
+
+  const trust_adj = trust_score > 85 ? -15 : trust_score > 70 ? -8 : 0;
+
+  const rain_adj = Math.min(Math.round(forecast_rain * 0.5), 15);
+
+  const aqi_adj = forecast_aqi > 200 ? 8 : forecast_aqi > 100 ? 4 : 0;
+
+  const seasonal_adj = [6, 7, 8, 9].includes(month) ? 10 : 0;
+
+  let final =
+    base + risk_adj + trust_adj + rain_adj + aqi_adj + seasonal_adj;
+
+  const bounds = {
+    basic: [79, 129],
+    standard: [149, 199],
+    premium: [249, 349],
+  } as const;
+  final = Math.max(bounds[tier][0], Math.min(bounds[tier][1], final));
+
+  const risk_label =
+    zone_risk > 65 ? "HIGH" : zone_risk > 35 ? "MEDIUM" : "LOW";
+  const explainer =
+    `Base (${tier}): ₹${base}. ` +
+    `Zone risk ${risk_label}: +${risk_adj}. ` +
+    `Trust score (${trust_score}): ${trust_adj}. ` +
+    `Rain forecast (${forecast_rain}mm): +${rain_adj}. ` +
+    `Final: ₹${final}`;
+
+  return { premium: final, explainer };
+}
+
+export const TIER_MAX_PAYOUT: Record<PremiumTier, number> = {
+  basic: 500,
+  standard: 1000,
+  premium: 2000,
 };
-
-function getCityAdjustment(city: string): number {
-  const c = city.toLowerCase();
-  switch (c) {
-    case "mumbai": return 10;
-    case "delhi": return 12;
-    case "chennai": return 4;
-    case "hyderabad": return 3;
-    case "bangalore": return 0;
-    default: return 0;
-  }
-}
-
-function getZoneRisk(zone: string): { riskLevel: "low" | "medium" | "high", adjustment: number } {
-  const z = zone.toLowerCase();
-  if (z.includes("koramangala")) return { riskLevel: "high", adjustment: 20 };
-  if (z.includes("hsr")) return { riskLevel: "medium", adjustment: 15 };
-  if (z.includes("indiranagar")) return { riskLevel: "medium", adjustment: 12 };
-  if (z.includes("whitefield")) return { riskLevel: "medium", adjustment: 10 };
-  
-  return { riskLevel: "low", adjustment: 0 };
-}
-
-function getTrustDiscount(score?: number): number {
-  const ts = score ?? 75; // Default score
-  if (ts >= 80) return 10;
-  if (ts >= 60) return 5;
-  return 0;
-}
-
-export function calculatePremium(inputs: PremiumInputs): PremiumResult {
-  const basePremium = BASE_RATES[inputs.tierId] || 179;
-  
-  const cityAdjustment = getCityAdjustment(inputs.city);
-  const { riskLevel, adjustment: zoneAdjustment } = getZoneRisk(inputs.zone);
-  const trustDiscount = getTrustDiscount(inputs.trustScore);
-
-  let finalPremium = basePremium + cityAdjustment + zoneAdjustment - trustDiscount;
-  
-  // Safety rule: clamp minimum premium so it doesn't fall below a sensible floor
-  const floor = basePremium - 15;
-  if (finalPremium < floor) {
-    finalPremium = floor;
-  }
-
-  const explanation: PremiumExplanationLine[] = [
-    {
-      label: `Base Premium (${inputs.tierId})`,
-      type: "base",
-      amount: basePremium,
-      displayValue: `₹${basePremium}`
-    }
-  ];
-
-  if (cityAdjustment > 0) {
-    explanation.push({
-      label: `City Adjustment (${inputs.city})`,
-      type: "adjustment",
-      amount: cityAdjustment,
-      displayValue: `+₹${cityAdjustment}`
-    });
-  }
-
-  if (zoneAdjustment > 0) {
-    explanation.push({
-      label: `Zone Risk (${inputs.zone} - ${riskLevel})`,
-      type: "adjustment",
-      amount: zoneAdjustment,
-      displayValue: `+₹${zoneAdjustment}`
-    });
-  }
-
-  if (trustDiscount > 0) {
-    explanation.push({
-      label: "Trust Score Discount",
-      type: "discount",
-      amount: trustDiscount,
-      displayValue: `-₹${trustDiscount}`
-    });
-  }
-
-  explanation.push({
-    label: "Final Weekly Premium",
-    type: "final",
-    amount: finalPremium,
-    displayValue: `₹${finalPremium}`
-  });
-
-  return {
-    basePremium,
-    finalPremium,
-    riskLevel,
-    zoneAdjustment,
-    cityAdjustment,
-    trustDiscount,
-    explanation
-  };
-}
