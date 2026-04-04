@@ -8,20 +8,173 @@
 ---
 
 ## 📋 Table of Contents
-1. [Events](#events)
-2. [The Problem](#the-problem)
-3. [Meet Rajan — Our Persona](#meet-rajan--our-persona)
-4. [The Solution](#the-solution)
-5. [Core Features](#core-features)
-6. [Disruption Triggers](#disruption-triggers)
-7. [Weekly Premium Model](#weekly-premium-model)
-8. [AI/ML Architecture](#aiml-architecture)
-9. [Fraud Detection](#fraud-detection)
-10. [Tech Stack](#tech-stack)
-11. [System Architecture](#system-architecture)
-12. [Application Workflow](#application-workflow)
-13. [6-Week Development Plan](#6-week-development-plan)
-14. [Future Roadmap](#future-roadmap)
+1. [Getting Started](#getting-started)
+2. [Events](#events)
+3. [The Problem](#the-problem)
+4. [Meet Rajan — Our Persona](#meet-rajan--our-persona)
+5. [The Solution](#the-solution)
+6. [Core Features](#core-features)
+7. [Disruption Triggers](#disruption-triggers)
+8. [Weekly Premium Model](#weekly-premium-model)
+9. [AI/ML Architecture](#aiml-architecture)
+10. [Fraud Detection](#fraud-detection)
+11. [Tech Stack](#tech-stack)
+12. [System Architecture](#system-architecture)
+13. [Application Workflow](#application-workflow)
+14. [6-Week Development Plan](#6-week-development-plan)
+15. [Future Roadmap](#future-roadmap)
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+| Tool | Version | Notes |
+|------|---------|-------|
+| **Node.js** | 18+ | [nodejs.org](https://nodejs.org) |
+| **npm** | 9+ | Comes with Node |
+| **Python** | 3.10+ | [python.org](https://python.org) |
+| **Git** | Any | [git-scm.com](https://git-scm.com) |
+
+> **Supabase** is cloud-hosted — no local database setup needed. The `.env` file below contains the project credentials.
+
+---
+
+### Step 1 — Clone the repository
+
+```bash
+git clone https://github.com/<your-username>/Nimbus.git
+cd Nimbus
+```
+
+---
+
+### Step 2 — Set up the environment file
+
+Create a `.env` file in the project root:
+
+```bash
+# Copy the template (if provided) or create manually
+cp .env.example .env   # Linux/macOS
+# or on Windows:
+copy .env.example .env
+```
+
+The `.env` must contain:
+
+```env
+VITE_SUPABASE_URL=https://<your-project>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<your-anon-key>
+VITE_SUPABASE_PROJECT_ID=<your-project-id>
+VITE_ML_API_BASE_URL=http://localhost:8000
+```
+
+> Contact the repo owner for the actual Supabase credentials if you don't have them.
+
+---
+
+### Step 3 — Install frontend dependencies
+
+```bash
+# From the project root
+npm install
+```
+
+---
+
+### Step 4 — Install Python dependencies
+
+Open **two separate terminals** — one for each service.
+
+**Terminal A — ML Service:**
+```bash
+cd backend/ml_service
+pip install -r requirements.txt
+```
+
+**Terminal B — API Gateway:**
+```bash
+cd backend/gateway
+pip install -r requirements.txt
+```
+
+> If you don't have a virtual environment, it's recommended:
+> ```bash
+> python -m venv .venv
+> .venv\Scripts\activate   # Windows
+> source .venv/bin/activate  # macOS/Linux
+> pip install -r requirements.txt
+> ```
+
+---
+
+### Step 5 — Run all three services
+
+You need **3 terminals running simultaneously**. Start them in this order:
+
+**Terminal 1 — ML Service** (must start first)
+```bash
+cd backend/ml_service
+uvicorn nimbus_ml_api:app --host 0.0.0.0 --port 8001 --reload
+```
+✅ Verify: http://localhost:8001/health → `{"status":"ok","models":["premium","fraud"]}`
+
+---
+
+**Terminal 2 — API Gateway** (start after ML service is up)
+```bash
+cd backend/gateway
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+```
+✅ Verify: http://localhost:8000/health → `{"status":"ok","gateway":"healthy","ml_service":"connected",...}`
+
+---
+
+**Terminal 3 — Frontend**
+```bash
+# From the project root
+npm run dev
+```
+✅ Open: http://localhost:5173
+
+---
+
+### Service Summary
+
+| Service | Port | What it does |
+|---------|------|-------------|
+| ML Service | `8001` | XGBoost models — premium calculation + fraud scoring |
+| API Gateway | `8000` | Proxies frontend requests to ML service |
+| Frontend | `5173` | React app — connects to Gateway + Supabase |
+
+> **Note:** If the backend isn't running, the frontend still works. ML calls fall back to a local calculation formula, and the **AI Online** badge in the navbar will show red/offline.
+
+---
+
+### Step 6 — Try the demo
+
+1. Open http://localhost:5173
+2. Click **Get Coverage** → fill in the 3-step onboarding form
+3. Use any test data — e.g.:
+   - Name: `Rajan Kumar`, Phone: `9876543210`, Swiggy ID: `SWG-BLR-0001`, UPI: `rajan@ybl`
+   - City: `Bangalore`, Zone: `Koramangala`, Pincode: `560034`
+   - Plan: **Standard**
+4. After onboarding, go to **Dashboard** to see your profile
+5. Go to **Triggers** → click **Simulate Disruption** to trigger a payout
+6. Check **Claims & Payouts** to see the payout appear
+
+---
+
+### Common Issues
+
+| Problem | Fix |
+|---------|-----|
+| `EADDRINUSE: port 5173` | Another Vite instance is running — kill it first or use another port |
+| `ModuleNotFoundError: xgboost` | Run `pip install -r requirements.txt` in the correct folder |
+| AI badge shows **Offline** | ML Service (port 8001) is not running — start Terminal 1 first |
+| Blank dashboard after onboarding | Check Supabase `.env` credentials are correct |
+| Port 8000 returns 503 | Gateway can't reach ML service — make sure port 8001 is up first |
 
 ---
 
